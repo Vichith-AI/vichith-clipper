@@ -27,9 +27,6 @@
   Single-source camera tracking with smooth pan-and-scan easing (`easeOutCubic`) that keeps the active speaker centered in vertical 9:16 format.
 - **🔥 Animated Kinetic Captions:**  
   Sub-second aligned captions with word-level highlight wipes, active pill bounces, and support for English and Indian regional languages (Hindi, Tamil, Telugu, Kannada, etc. powered by Sarvam AI and faster-whisper).
-- **🚀 Dual Deployment Architecture:**
-  - **Hosted Cloud Mode on Vercel (`https://clipper.vichith.in`):** Uses Next.js 15 Edge/Serverless routes, Supabase job queueing, AWS S3 (`ap-south-2`) storage, and dedicated EC2 CPU/GPU workers.
-  - **Self-Hosted Local Mode (Docker / Python):** Run everything on your own machine with a single `docker compose up` command or local Python runner. Zero cloud API keys required.
 - **🤖 Model Context Protocol (MCP) Code Mode:**  
   Built-in stdio/SSE MCP server enabling Claude Code, Cursor, and Antigravity to autonomously ingest videos, generate clips, and query rendering progress.
 - **✨ 1-Click Vichith Compose Export:**  
