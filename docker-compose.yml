@@ -1,0 +1,30 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - CLIPPER_MODE=local
+      - LOCAL_WORKER_URL=http://worker:8000
+      - NODE_ENV=production
+    depends_on:
+      - worker
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKER_MODE=local
+      - WHISPER_MODEL=base
+    volumes:
+      - clipper-storage:/app/storage
+    restart: unless-stopped
+
+volumes:
+  clipper-storage:

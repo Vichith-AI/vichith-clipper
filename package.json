@@ -1,0 +1,32 @@
+{
+  "name": "vichith-clipper-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open-Source AI Video Clipper — Turn Long VODs into 9:16 Vertical Shorts",
+  "workspaces": [
+    "apps/*",
+    "mcp"
+  ],
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/web run build",
+    "build:mcp": "npm --workspace mcp run build",
+    "start": "npm --workspace apps/web run start",
+    "worker": "cd worker && python worker.py"
+  },
+  "keywords": [
+    "ai-video",
+    "video-clipper",
+    "shorts",
+    "reels",
+    "tiktok",
+    "gaming-split",
+    "yt-dlp",
+    "whisper",
+    "ffmpeg",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "author": "Vichith Labs Private Limited <hello@vichith.in>",
+  "license": "AGPL-3.0"
+}
