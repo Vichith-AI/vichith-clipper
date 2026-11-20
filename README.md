@@ -129,49 +129,6 @@ npm run dev
 
 ---
 
-## ☁️ Cloud Deployment (Vercel + AWS + Supabase)
-
-Vichith Clipper is optimized for zero-cold-start, serverless deployment on **Vercel** with heavy media processing offloaded to asynchronous background workers.
-
-### 1. Environment Configuration
-Copy `.env.example` to `.env.local`:
-```bash
-cp .env.example apps/web/.env.local
-```
-
-Configure your cloud credentials:
-```ini
-CLIPPER_MODE=cloud
-NEXT_PUBLIC_APP_URL=https://clipper.vichith.in
-VICHITH_COMPOSE_URL=https://www.vichith.in
-
-# Supabase (Database & Realtime Status)
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# AWS S3 Storage (ap-south-2 Hyderabad)
-STORAGE_PROVIDER=s3
-AWS_REGION=ap-south-2
-AWS_S3_BUCKET=your-bucket-name
-AWS_ACCESS_KEY_ID=your-key-id
-AWS_SECRET_ACCESS_KEY=your-secret-key
-
-# EC2 Background Worker
-WORKER_CPU_URL=http://your-ec2-worker-ip:8000
-WORKER_SHARED_SECRET=your-secure-secret
-```
-
-### 2. Deploy Web App to Vercel
-Deploy the `apps/web` folder directly to Vercel:
-```bash
-cd apps/web
-npx vercel --prod
-```
-The included `vercel.json` ensures lightweight serverless execution (15–60s max) that safely dispatches jobs without risking gateway timeouts.
-
----
-
 ## 🤖 Model Context Protocol (MCP) Integration
 
 Vichith Clipper includes an official Model Context Protocol (MCP) server so you can use it inside **Claude Code**, **Cursor**, or **Antigravity**.
