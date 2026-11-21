@@ -17,6 +17,8 @@ interface ClipperInspectorProps {
     onTranscribe: () => void;
     busy: boolean;
     projectId: string | null;
+    onExportToCompose?: (clip: ProducedClip) => void;
+    exporting?: boolean;
 }
 
 export function ClipperInspector({
@@ -29,6 +31,8 @@ export function ClipperInspector({
     onTranscribe,
     busy,
     projectId,
+    onExportToCompose,
+    exporting,
 }: ClipperInspectorProps) {
     const hasClips = clips.length > 0;
     const selectedClip = hasClips ? clips[selectedClipIndex] ?? clips[0] : null;
@@ -50,7 +54,7 @@ export function ClipperInspector({
     ];
 
     return (
-        <aside className="flex h-full w-full flex-col justify-between overflow-y-auto border-l border-white/10 bg-vichith-graphite/40 text-vichith-white p-4 sm:p-5">
+        <div className="flex min-h-full w-full flex-col justify-between text-vichith-white p-4 sm:p-5">
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
@@ -242,15 +246,26 @@ export function ClipperInspector({
             {/* Bottom Primary Compose Link */}
             {hasClips && selectedClip && (
                 <div className="pt-4 border-t border-white/[0.08]">
-                    <Link
-                        href={selectedClip.composePath}
-                        className="v-key flex h-11 w-full items-center justify-center gap-2 rounded-[12px] px-4 font-display text-xs font-semibold text-vichith-black transition-colors"
+                    <button
+                        type="button"
+                        disabled={exporting}
+                        onClick={() => onExportToCompose?.(selectedClip)}
+                        className="v-key flex h-11 w-full items-center justify-center gap-2 rounded-[12px] px-4 font-display text-xs font-semibold text-vichith-black transition-all hover:shadow-[0_0_20px_rgba(52,211,153,0.3)] disabled:opacity-50"
                     >
-                        <span>Edit Tracks &amp; Captions in Compose</span>
-                        <ArrowUpRight className="h-4 w-4" />
-                    </Link>
+                        {exporting ? (
+                            <>
+                                <GlyphWorking className="h-4 w-4" />
+                                <span>Exporting to Compose…</span>
+                            </>
+                        ) : (
+                            <>
+                                <span>Edit Tracks &amp; Captions in Compose</span>
+                                <ArrowUpRight className="h-4 w-4" />
+                            </>
+                        )}
+                    </button>
                 </div>
             )}
-        </aside>
+        </div>
     );
 }

@@ -1,10 +1,24 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
-import { ArrowUpRight, ChevronDown, Film, FolderKanban, Plus, SlidersHorizontal, Eye, Layers, UploadCloud, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+    ArrowUpRight,
+    ChevronDown,
+    Film,
+    FolderKanban,
+    Plus,
+    SlidersHorizontal,
+    Eye,
+    Layers,
+    UploadCloud,
+    Globe,
+    Cpu,
+    RefreshCw,
+    Sparkles,
+} from 'lucide-react';
 import type { Gta6EntitlementState } from '@/lib/launch/gta6Promo';
 import { formatVodDuration } from './config';
+import { parseStreamUrl } from '@/lib/streamIngest';
 
 export interface VodAsset {
     id: string;
@@ -14,6 +28,14 @@ export interface VodAsset {
     source: string;
     createdAt: string;
     generationMeta?: { clientDurationSecs?: number; duration?: { durationSecs?: number } } | null;
+}
+
+interface WorkerBadgeState {
+    state: 'running' | 'pending' | 'stopping' | 'stopped' | 'shutting-down' | 'unknown';
+    region: string;
+    instanceId: string;
+    configured: boolean;
+    error?: string | null;
 }
 
 interface ClipperHeaderProps {
@@ -57,21 +79,91 @@ export function ClipperHeader({
     onMobileTabChange,
     busy,
 }: ClipperHeaderProps) {
-    const activeProject = projects.find((p) => p.id === projectId);
+    const streamInfo = streamUrl ? parseStreamUrl(streamUrl) : null;
+    const [worker, setWorker] = useState<WorkerBadgeState>({
+        state: 'unknown',
+        region: 'ap-south-2',
+        instanceId: 'i-0b493811ffcdff29b',
+        configured: true,
+    });
+    const [wakingWorker, setWakingWorker] = useState(false);
+
+    // Poll worker status periodically
+    useEffect(() => {
+        let active = true;
+        const fetchStatus = async () => {
+            try {
+                const res = await fetch('/api/worker/status');
+                if (!res.ok) return;
+                const data = await res.json();
+                if (active) {
+                    setWorker({
+                        state: data.state || 'unknown',
+                        region: data.region || 'ap-south-2',
+                        instanceId: data.instanceId || 'i-0b493811ffcdff29b',
+                        configured: data.configured ?? true,
+                        error: data.error,
+                    });
+                }
+            } catch {
+                // Non-blocking
+            }
+        };
+
+        fetchStatus();
+        const interval = setInterval(fetchStatus, 30000);
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
+    }, []);
+
+    const handleWakeWorker = async () => {
+        setWakingWorker(true);
+        try {
+            const res = await fetch('/api/worker/wake', { method: 'POST' });
+            const data = await res.json();
+            if (data.ok || data.status?.state) {
+                setWorker((prev) => ({
+                    ...prev,
+                    state: data.status?.state || 'pending',
+                }));
+            }
+        } catch (e) {
+            console.error('Failed to wake worker:', e);
+        } finally {
+            setWakingWorker(false);
+        }
+    };
+
+    const composeBaseUrl = process.env.NEXT_PUBLIC_VICHITH_URL || 'https://www.vichith.in';
+    const composeUrl = projectId && projectId !== 'default'
+        ? `${composeBaseUrl}/p/${projectId}/compose`
+        : `${composeBaseUrl}/compose`;
 
     return (
-        <header className="relative z-20 flex h-[52px] w-full items-center justify-between border-b border-white/10 bg-vichith-black px-4 sm:px-6">
+        <header className="relative z-20 flex h-[52px] w-full items-center justify-between border-b border-white/10 bg-[#0A0C0E] px-4 sm:px-6 select-none">
             {/* Left: Project & Media Switcher */}
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                {/* Brand / Logo */}
+                <div className="flex items-center gap-2 mr-1">
+                    <span className="font-display font-bold tracking-tight text-vichith-white text-sm">
+                        vichith<span className="text-vichith-mint">.clipper</span>
+                    </span>
+                    <span className="hidden sm:inline-block rounded bg-vichith-mint/10 border border-vichith-mint/20 px-1.5 py-0.5 text-[9px] font-mono font-medium text-vichith-mint">
+                        PRO
+                    </span>
+                </div>
+
                 {/* Project Selector */}
-                <div className="flex items-center gap-1.5 rounded-full bg-vichith-graphite/80 px-2.5 py-1 text-xs text-vichith-silver transition-colors hover:text-vichith-white">
+                <div className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-xs text-vichith-silver transition-colors hover:text-vichith-white">
                     <FolderKanban className="h-3.5 w-3.5 text-vichith-mint flex-shrink-0" />
                     <select
                         aria-label="Active Project"
                         value={projectId ?? ''}
                         disabled={busy}
                         onChange={(e) => onSelectProject(e.target.value)}
-                        className="max-w-[120px] sm:max-w-[160px] truncate bg-transparent font-medium text-vichith-white outline-none cursor-pointer text-xs"
+                        className="max-w-[120px] sm:max-w-[150px] truncate bg-transparent font-medium text-vichith-white outline-none cursor-pointer text-xs"
                     >
                         {projects.map((project) => (
                             <option key={project.id} value={project.id} className="bg-vichith-graphite text-vichith-white">
@@ -87,7 +179,7 @@ export function ClipperHeader({
                     title="New project"
                     onClick={onNewProject}
                     disabled={busy}
-                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-vichith-silver transition-colors hover:bg-white/[0.12] hover:text-vichith-white disabled:opacity-50"
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.08] text-vichith-silver transition-colors hover:bg-white/[0.12] hover:text-vichith-white disabled:opacity-50"
                 >
                     <Plus className="h-3.5 w-3.5" />
                 </button>
@@ -96,7 +188,7 @@ export function ClipperHeader({
 
                 {/* VOD Selector Pill */}
                 {selectedAsset ? (
-                    <div className="flex items-center gap-2 rounded-full bg-vichith-graphite/80 px-3 py-1 text-xs text-vichith-silver">
+                    <div className="flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.08] px-3 py-1 text-xs text-vichith-silver">
                         <Film className="h-3.5 w-3.5 text-vichith-mint flex-shrink-0" />
                         {assets.length > 1 ? (
                             <div className="flex items-center gap-1">
@@ -109,7 +201,7 @@ export function ClipperHeader({
                                 >
                                     {assets.map((asset) => (
                                         <option key={asset.id} value={asset.id} className="bg-vichith-graphite text-vichith-white">
-                                            {asset.source === 'uploaded' ? 'VOD' : 'Gen'} · {asset.id.slice(0, 8)}
+                                            {asset.source === 'uploaded' ? 'VOD' : 'Stream'} · {asset.id.slice(0, 8)}
                                         </option>
                                     ))}
                                 </select>
@@ -117,14 +209,11 @@ export function ClipperHeader({
                             </div>
                         ) : (
                             <span className="font-mono text-[11px] text-vichith-white">
-                                {selectedAsset.id.slice(0, 8)}
+                                {selectedAsset.id.slice(0, 10)}
                             </span>
                         )}
-                        <span className="rounded-full bg-vichith-surface px-1.5 py-0.5 font-mono text-[10px] text-vichith-silver">
+                        <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-vichith-silver">
                             {formatVodDuration(durationSecs)}
-                        </span>
-                        <span className="hidden md:inline rounded bg-white/[0.08] px-1 py-0.2 font-mono text-[9px] text-vichith-muted">
-                            1080p
                         </span>
                         <button
                             type="button"
@@ -140,45 +229,67 @@ export function ClipperHeader({
                         type="button"
                         onClick={onUploadClick}
                         disabled={busy}
-                        className="flex items-center gap-1.5 rounded-full bg-vichith-graphite px-3 py-1 text-xs text-vichith-silver hover:bg-vichith-surface hover:text-vichith-white transition-colors"
+                        className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-3 py-1 text-xs text-vichith-silver hover:bg-white/[0.1] hover:text-vichith-white transition-colors"
                     >
                         <UploadCloud className="h-3.5 w-3.5 text-vichith-mint" />
                         <span>Upload Video</span>
                     </button>
                 )}
+            </div>
 
-                {/* Stream URL Ingestion Input */}
-                <div className="hidden xl:flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-xs focus-within:border-vichith-mint/50 transition-colors">
-                    <Globe className="h-3 w-3 text-vichith-mint shrink-0" />
+            {/* Center: Single, Clean Stream URL Ingestion Bar */}
+            <div className="hidden lg:flex items-center gap-2">
+                <div className="flex items-center gap-2 rounded-full bg-black/60 border border-white/[0.12] px-3 py-1.5 text-xs focus-within:border-vichith-mint/60 focus-within:ring-1 focus-within:ring-vichith-mint/30 transition-all shadow-inner">
+                    {/* Platform Indicator */}
+                    {streamInfo?.platform === 'youtube' && (
+                        <span className="rounded bg-red-500/20 text-red-400 border border-red-500/30 px-1 py-0.2 font-mono text-[9px] font-bold">
+                            YT
+                        </span>
+                    )}
+                    {streamInfo?.platform === 'twitch' && (
+                        <span className="rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 py-0.2 font-mono text-[9px] font-bold">
+                            TWITCH
+                        </span>
+                    )}
+                    {streamInfo?.platform === 'kick' && (
+                        <span className="rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 py-0.2 font-mono text-[9px] font-bold">
+                            KICK
+                        </span>
+                    )}
+                    {!streamInfo?.valid && (
+                        <Globe className="h-3.5 w-3.5 text-vichith-silver shrink-0" />
+                    )}
+
                     <input
                         type="url"
-                        placeholder="Paste YouTube / Twitch / Kick URL..."
+                        placeholder="Paste YouTube, Twitch, or Kick stream URL…"
                         value={streamUrl || ''}
                         disabled={busy}
                         onChange={(e) => onStreamUrlChange?.(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && onImportStream?.(streamUrl || '')}
-                        className="w-48 2xl:w-60 bg-transparent text-[11px] text-vichith-white placeholder:text-vichith-muted outline-none"
+                        onKeyDown={(e) => e.key === 'Enter' && streamUrl && onImportStream?.(streamUrl)}
+                        className="w-64 xl:w-80 bg-transparent text-[11px] text-vichith-white placeholder:text-vichith-muted/70 outline-none"
                     />
+
                     {streamUrl && (
                         <button
                             type="button"
                             onClick={() => onImportStream?.(streamUrl)}
                             disabled={busy}
-                            className="rounded px-1.5 py-0.5 bg-vichith-mint text-vichith-black text-[10px] font-semibold hover:bg-vichith-emerald transition-colors"
+                            className="rounded-full px-2.5 py-0.5 bg-vichith-mint text-vichith-black text-[10px] font-semibold hover:bg-vichith-emerald transition-colors shadow-[0_0_12px_rgba(52,211,153,0.3)] disabled:opacity-40"
                         >
-                            Import
+                            Clip Stream
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Mobile / Tablet View Switcher (Hidden on XL+) */}
-            <div className="flex xl:hidden items-center gap-1 rounded-full bg-vichith-graphite p-0.5 text-xs">
+            <div className="flex xl:hidden items-center gap-1 rounded-full bg-white/[0.04] p-0.5 text-xs">
                 <button
                     type="button"
                     onClick={() => onMobileTabChange('controls')}
                     className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                        activeMobileTab === 'controls' ? 'bg-vichith-surface text-vichith-white' : 'text-vichith-silver hover:text-vichith-white'
+                        activeMobileTab === 'controls' ? 'bg-white/[0.1] text-vichith-white font-medium' : 'text-vichith-silver hover:text-vichith-white'
                     }`}
                 >
                     <SlidersHorizontal className="h-3 w-3" />
@@ -188,7 +299,7 @@ export function ClipperHeader({
                     type="button"
                     onClick={() => onMobileTabChange('stage')}
                     className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                        activeMobileTab === 'stage' ? 'bg-vichith-surface text-vichith-white' : 'text-vichith-silver hover:text-vichith-white'
+                        activeMobileTab === 'stage' ? 'bg-white/[0.1] text-vichith-white font-medium' : 'text-vichith-silver hover:text-vichith-white'
                     }`}
                 >
                     <Eye className="h-3 w-3" />
@@ -198,7 +309,7 @@ export function ClipperHeader({
                     type="button"
                     onClick={() => onMobileTabChange('inspector')}
                     className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
-                        activeMobileTab === 'inspector' ? 'bg-vichith-surface text-vichith-white' : 'text-vichith-silver hover:text-vichith-white'
+                        activeMobileTab === 'inspector' ? 'bg-white/[0.1] text-vichith-white font-medium' : 'text-vichith-silver hover:text-vichith-white'
                     }`}
                 >
                     <Layers className="h-3 w-3" />
@@ -206,15 +317,52 @@ export function ClipperHeader({
                 </button>
             </div>
 
-            {/* Right: Mode & Credit Status */}
+            {/* Right: EC2 Worker State, Mode & Compose Export */}
             <div className="flex items-center gap-2 sm:gap-3">
+                {/* Real-time EC2 Worker Pill */}
+                <div
+                    title={
+                        worker.state === 'running'
+                            ? `EC2 worker-cpu (${worker.instanceId}) active in ${worker.region}`
+                            : worker.state === 'pending'
+                            ? `EC2 worker-cpu is starting up...`
+                            : `EC2 worker-cpu is currently stopped (0$/hr). Click to wake.`
+                    }
+                    className="hidden sm:flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-[11px]"
+                >
+                    <Cpu className="h-3 w-3 text-vichith-silver shrink-0" />
+                    {worker.state === 'running' ? (
+                        <div className="flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="font-mono text-[10px] text-emerald-300 font-medium">Worker Online</span>
+                        </div>
+                    ) : worker.state === 'pending' ? (
+                        <div className="flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" />
+                            <span className="font-mono text-[10px] text-amber-300 font-medium">Waking EC2…</span>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleWakeWorker}
+                            disabled={wakingWorker}
+                            className="flex items-center gap-1 text-[10px] font-mono text-vichith-silver hover:text-vichith-mint transition-colors"
+                        >
+                            <span className="h-1.5 w-1.5 rounded-full bg-neutral-500" />
+                            <span>Worker Stopped</span>
+                            <span className="underline ml-0.5 text-vichith-mint">Wake</span>
+                            {wakingWorker && <RefreshCw className="h-2.5 w-2.5 animate-spin ml-0.5" />}
+                        </button>
+                    )}
+                </div>
+
                 {/* Mode Selector */}
-                <div className="hidden md:flex items-center rounded-full bg-vichith-graphite p-0.5 text-xs">
+                <div className="hidden md:flex items-center rounded-full bg-white/[0.04] border border-white/[0.08] p-0.5 text-xs">
                     <button
                         type="button"
                         onClick={() => onModeChange('auto')}
                         className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-colors ${
-                            mode === 'auto' ? 'bg-vichith-surface text-vichith-white' : 'text-vichith-silver hover:text-vichith-white'
+                            mode === 'auto' ? 'bg-white/[0.1] text-vichith-white font-medium' : 'text-vichith-silver hover:text-vichith-white'
                         }`}
                     >
                         <span className="h-1.5 w-1.5 rounded-full bg-vichith-mint" />
@@ -224,7 +372,7 @@ export function ClipperHeader({
                         type="button"
                         onClick={() => onModeChange('manual')}
                         className={`rounded-full px-3 py-1 text-xs transition-colors ${
-                            mode === 'manual' ? 'bg-vichith-surface text-vichith-white' : 'text-vichith-silver hover:text-vichith-white'
+                            mode === 'manual' ? 'bg-white/[0.1] text-vichith-white font-medium' : 'text-vichith-silver hover:text-vichith-white'
                         }`}
                     >
                         Manual Timeline
@@ -232,47 +380,23 @@ export function ClipperHeader({
                 </div>
 
                 {/* Credit Status Pill */}
-                <div className="flex items-center gap-1.5 rounded-full bg-vichith-graphite/80 px-2.5 py-1 text-[11px] text-vichith-silver">
-                    <span className="h-1.5 w-1.5 rounded-full bg-vichith-mint animate-pulse" />
-                    <span className="font-mono text-vichith-white">
+                <div className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-[11px] text-vichith-silver">
+                    <span className="h-1.5 w-1.5 rounded-full bg-vichith-mint" />
+                    <span className="font-mono text-vichith-white text-[10px]">
                         {entitlement ? `${entitlement.remaining} free runs` : '3 credits'}
                     </span>
                 </div>
 
-                {/* Compose Link */}
-                {projectId && (
-                    <Link
-                        href={`/p/${projectId}/compose`}
-                        className="hidden sm:inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] text-vichith-silver hover:bg-white/[0.12] hover:text-vichith-white transition-colors"
-                    >
-                        <span>Compose</span>
-                        <ArrowUpRight className="h-3 w-3" />
-                    </Link>
-                )}
-
-                {/* Stream URL Ingestion Input */}
-                <div className="hidden xl:flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-xs focus-within:border-vichith-mint/50 transition-colors">
-                    <Globe className="h-3 w-3 text-vichith-mint shrink-0" />
-                    <input
-                        type="url"
-                        placeholder="Paste YouTube / Twitch / Kick URL..."
-                        value={streamUrl || ''}
-                        disabled={busy}
-                        onChange={(e) => onStreamUrlChange?.(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && onImportStream?.(streamUrl || '')}
-                        className="w-48 2xl:w-60 bg-transparent text-[11px] text-vichith-white placeholder:text-vichith-muted outline-none"
-                    />
-                    {streamUrl && (
-                        <button
-                            type="button"
-                            onClick={() => onImportStream?.(streamUrl)}
-                            disabled={busy}
-                            className="rounded px-1.5 py-0.5 bg-vichith-mint text-vichith-black text-[10px] font-semibold hover:bg-vichith-emerald transition-colors"
-                        >
-                            Import
-                        </button>
-                    )}
-                </div>
+                {/* Direct Vichith Compose Link */}
+                <a
+                    href={composeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.08] hover:bg-vichith-mint hover:text-vichith-black px-3 py-1 text-xs font-semibold text-vichith-white transition-all shadow-sm"
+                >
+                    <span>Compose</span>
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                </a>
             </div>
         </header>
     );

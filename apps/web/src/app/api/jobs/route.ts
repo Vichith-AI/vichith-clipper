@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { wakeWorker, getWorkerStatus } from '@/lib/worker/ec2Bridge';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
                     const data = await res.json();
                     return NextResponse.json({ ok: true, jobId, ...data });
                 }
-            } catch (err) {
+            } catch {
                 // If local worker not reachable, return queued job state
             }
 
@@ -56,8 +57,10 @@ export async function POST(request: NextRequest) {
                     captionMotion: body.captionMotion || 'highlight_wipe',
                     sourceUrl: body.sourceUrl,
                     assetId: body.assetId,
+                    language: body.language || 'auto',
+                    targetCount: body.targetCount || 3,
                     worker: {
-                        inputUrl: body.inputUrl,
+                        inputUrl: body.inputUrl || body.sourceUrl,
                         sourceUrl: body.sourceUrl,
                         completionUrl: `${request.nextUrl.origin}/api/jobs/${jobId}/complete`,
                         completionSecret: crypto.randomUUID(),
@@ -70,11 +73,27 @@ export async function POST(request: NextRequest) {
             }
         }
 
+        // Trigger worker wake-on-demand if stopped
+        let workerState = 'unknown';
+        try {
+            const status = await getWorkerStatus();
+            workerState = status.state;
+            if (status.state === 'stopped') {
+                const wakeResult = await wakeWorker();
+                if (wakeResult.ok) {
+                    workerState = 'pending';
+                }
+            }
+        } catch (wakeErr) {
+            console.warn('[clipper] Worker wake check warning:', wakeErr);
+        }
+
         return NextResponse.json({
             ok: true,
             jobId,
             status: 'queued',
             mode: 'cloud',
+            workerState,
         });
     } catch (error) {
         return NextResponse.json(

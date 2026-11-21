@@ -1,32 +1,30 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useProjects } from '@/hooks/useProjects';
-import { useProjectMediaUpload } from '@/hooks/useProjectMediaUpload';
-import { authedFetch } from '@/lib/auth/authedFetch';
-import { probeMediaDuration } from '@/lib/media/duration';
-import type { Gta6EntitlementState } from '@/lib/launch/gta6Promo';
-import { defaultGta6Entitlement } from '@/lib/launch/gta6Promo';
-import { useRegion } from '@/lib/region/RegionContext';
-import { trackLaunchEvent } from '@/lib/telemetry/launchTelemetry';
-import { parseStreamUrl } from '@/lib/streamIngest';
-import {
-    CLIPPER_MAX_VOD_SECS,
-    DEFAULT_CLIPPER_PREFERENCES,
-    validateVodFile,
-    type ClipperPreferences,
-} from './config';
 import { ClipperHeader, type VodAsset } from './ClipperHeader';
 import { ClipperControls } from './ClipperControls';
 import { ClipperStage, type ProducedClip } from './ClipperStage';
 import { ClipperInspector } from './ClipperInspector';
+import {
+    DEFAULT_CLIPPER_PREFERENCES,
+    type ClipperPreferences,
+    validateVodFile,
+} from './config';
+import { parseStreamUrl } from '@/lib/streamIngest';
+import { useProjects } from '@/hooks/useProjects';
+import { useProjectMediaUpload } from '@/hooks/useProjectMediaUpload';
+import { probeMediaDuration } from '@/lib/media/duration';
+import { authedFetch } from '@/lib/auth/authedFetch';
+import { useRegion } from '@/lib/region/RegionContext';
+import { defaultGta6Entitlement, type Gta6EntitlementState } from '@/lib/launch/gta6Promo';
 
-type Phase = 'idle' | 'preparing' | 'ready' | 'transcribing' | 'transcribed' | 'clipping' | 'error';
+type Phase = 'idle' | 'preparing' | 'transcribing' | 'clipping' | 'ready' | 'error';
 
 export function ClipperWorkspace() {
     const searchParams = useSearchParams();
     const { region } = useRegion();
+
     const { projects, create } = useProjects();
     const [projectId, setProjectId] = useState<string | null>('default');
     const [assets, setAssets] = useState<VodAsset[]>([]);
@@ -56,6 +54,10 @@ export function ClipperWorkspace() {
     const [clips, setClips] = useState<ProducedClip[]>([]);
     const [selectedClipIndex, setSelectedClipIndex] = useState(0);
     const [jobId, setJobId] = useState<string | null>(null);
+    const [serverProgress, setServerProgress] = useState<number | null>(null);
+    const [jobStatus, setJobStatus] = useState<string>('idle');
+    const [workerStatus, setWorkerStatus] = useState<any>(null);
+    const [exportingToCompose, setExportingToCompose] = useState(false);
     const [processingMode, setProcessingMode] = useState<'cloud' | 'browser'>('cloud');
     const [mode, setMode] = useState<'auto' | 'manual'>('auto');
     const [activeMobileTab, setActiveMobileTab] = useState<'controls' | 'stage' | 'inspector'>('stage');
@@ -77,7 +79,9 @@ export function ClipperWorkspace() {
 
         setError(null);
         setPhase('clipping');
-        setNote(`Connecting to ${stream.platform.toUpperCase()} stream…`);
+        setJobStatus('queued');
+        setServerProgress(0);
+        setNote(`Enqueuing ${stream.platform.toUpperCase()} stream for processing…`);
 
         const mockAsset: VodAsset = {
             id: `stream-${stream.videoId || Date.now().toString(36)}`,
@@ -97,6 +101,7 @@ export function ClipperWorkspace() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     sourceUrl: stream.normalizedUrl || urlToImport,
+                    inputUrl: stream.normalizedUrl || urlToImport,
                     layout: preferences.layout,
                     captionMotion: preferences.captionStyle === 'karaoke' ? 'highlight_wipe' : 'pop_in',
                     targetCount: preferences.targetCount,
@@ -108,7 +113,10 @@ export function ClipperWorkspace() {
             const body = await response.json();
             if (!response.ok) throw new Error(body.message ?? 'Could not start stream clipping job.');
             setJobId(body.jobId);
-            setNote('Analyzing stream audio & speech peaks…');
+            if (body.workerState) {
+                setWorkerStatus((prev: any) => ({ ...prev, state: body.workerState }));
+            }
+            setNote('Job enqueued. Checking compute worker…');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Stream import failed.');
             setPhase('error');
@@ -119,7 +127,6 @@ export function ClipperWorkspace() {
     useEffect(() => {
         if (!jobId || phase !== 'clipping') return;
         let active = true;
-        const jobStartedAt = Date.now();
 
         const poll = async () => {
             try {
@@ -129,17 +136,21 @@ export function ClipperWorkspace() {
 
                 const status = body.status;
                 const progress = body.progress ?? 0;
+                setJobStatus(status);
+                setServerProgress(progress);
+                if (body.workerStatus) {
+                    setWorkerStatus(body.workerStatus);
+                }
 
-                if (status === 'queued' || (status === 'processing' && progress <= 0)) {
-                    const elapsedSecs = (Date.now() - jobStartedAt) / 1000;
-                    if (elapsedSecs < 15) {
-                        setNote('Ingesting video stream…');
-                    } else if (elapsedSecs < 45) {
-                        setNote('Transcribing words with sub-frame sync…');
+                if (status === 'queued') {
+                    if (body.workerStatus?.state === 'stopped') {
+                        setNote('Worker is stopped. Wake instance to begin processing.');
+                    } else if (body.workerStatus?.state === 'pending') {
+                        setNote('Compute worker is waking up (ap-south-2)…');
                     } else {
-                        setNote('Framing vertical 9:16 cuts…');
+                        setNote('Job enqueued. Awaiting compute worker pickup…');
                     }
-                } else {
+                } else if (status === 'processing') {
                     setNote(`Rendering vertical shorts · ${Math.round(progress * 100)}%`);
                 }
 
@@ -190,6 +201,7 @@ export function ClipperWorkspace() {
         if (!files || files.length === 0) return;
         const file = files instanceof FileList ? files.item(0) : files[0];
         if (!file) return;
+
         const validation = validateVodFile(file, false);
         if (validation) {
             setError(validation);
@@ -228,10 +240,12 @@ export function ClipperWorkspace() {
     const produceClips = async () => {
         if (!selectedAsset) return;
         setPhase('clipping');
+        setJobStatus('queued');
+        setServerProgress(0);
         setError(null);
         setClips([]);
         setSelectedClipIndex(0);
-        setNote('Preparing your video…');
+        setNote('Enqueuing video for vertical processing…');
 
         try {
             const response = await authedFetch('/api/jobs', {
@@ -240,6 +254,7 @@ export function ClipperWorkspace() {
                 body: JSON.stringify({
                     assetId: selectedAsset.id,
                     inputUrl: selectedAsset.url,
+                    sourceUrl: selectedAsset.url,
                     layout: preferences.layout,
                     captionMotion: preferences.captionStyle === 'karaoke' ? 'highlight_wipe' : 'pop_in',
                     targetCount: preferences.targetCount,
@@ -249,17 +264,66 @@ export function ClipperWorkspace() {
             });
 
             const body = await response.json();
-            if (!response.ok) throw new Error(body.message ?? 'Could not start the clipping job.');
+            if (!response.ok) throw new Error(body.message ?? 'Failed to create job.');
             setJobId(body.jobId);
+            if (body.workerState) {
+                setWorkerStatus((prev: any) => ({ ...prev, state: body.workerState }));
+            }
+            setNote('Job enqueued. Checking compute worker…');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Clipping failed.');
+            setError(err instanceof Error ? err.message : 'Failed to produce clips.');
             setPhase('error');
         }
     };
 
+    // Wake EC2 Worker
+    const handleWakeWorker = async () => {
+        try {
+            const res = await fetch('/api/worker/wake', { method: 'POST' });
+            const data = await res.json();
+            if (data.status) {
+                setWorkerStatus(data.status);
+            }
+        } catch (e) {
+            console.error('Failed to wake worker:', e);
+        }
+    };
+
+    // Export to Vichith Compose Handoff
+    const handleExportToCompose = async (clip: ProducedClip) => {
+        try {
+            setExportingToCompose(true);
+            const res = await authedFetch('/api/export-to-compose', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clipId: clip.clipId || `clip-${clip.index}`,
+                    candidateId: clip.candidateId,
+                    projectId: projectId || undefined,
+                    assetId: clip.assetId,
+                    startSecs: clip.startSecs,
+                    endSecs: clip.endSecs,
+                    layout: preferences.layout,
+                    captionMotion: preferences.captionStyle === 'karaoke' ? 'highlight_wipe' : 'pop_in',
+                }),
+            });
+            const data = await res.json();
+            if (data.composeUrl) {
+                window.open(data.composeUrl, '_blank');
+            } else {
+                window.open('https://www.vichith.in/compose', '_blank');
+            }
+        } catch (e) {
+            console.error('Failed to export to compose:', e);
+            window.open('https://www.vichith.in/compose', '_blank');
+        } finally {
+            setExportingToCompose(false);
+        }
+    };
+
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden bg-vichith-black text-vichith-white select-none">
-            {/* Top Workspace Header Bar (52px height) */}
+        <div className="flex h-screen w-full flex-col overflow-hidden bg-[#060707] text-vichith-white font-sans antialiased">
+            {/* Header: Project Selector, Stream URL Input, Worker Status & Compose */}
             <ClipperHeader
                 projects={projects}
                 projectId={projectId}
@@ -334,6 +398,14 @@ export function ClipperWorkspace() {
                         framingLayout={preferences.layout}
                         captionStyle={preferences.captionStyle}
                         projectId={projectId}
+                        serverProgress={serverProgress}
+                        jobStatus={jobStatus}
+                        workerStatus={workerStatus}
+                        onWakeWorker={handleWakeWorker}
+                        onExportToCompose={handleExportToCompose}
+                        streamUrl={streamUrl}
+                        onStreamUrlChange={setStreamUrl}
+                        onImportStream={handleImportStream}
                     />
                 </main>
 
@@ -349,6 +421,8 @@ export function ClipperWorkspace() {
                         onTranscribe={() => {}}
                         busy={busy}
                         projectId={projectId}
+                        onExportToCompose={handleExportToCompose}
+                        exporting={exportingToCompose}
                     />
                 </aside>
             </div>

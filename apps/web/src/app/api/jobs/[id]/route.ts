@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getWorkerStatus } from '@/lib/worker/ec2Bridge';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,16 @@ export async function GET(
         return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
+    // Attach current worker instance status if job is pending/queued/processing
+    let workerStatus = null;
+    if (job.status === 'queued' || job.status === 'processing') {
+        try {
+            workerStatus = await getWorkerStatus();
+        } catch {
+            // Non-blocking
+        }
+    }
+
     return NextResponse.json({
         id: job.id,
         status: job.status,
@@ -45,5 +56,6 @@ export async function GET(
         errorMessage: job.error_message,
         createdAt: job.created_at,
         completedAt: job.completed_at,
+        workerStatus,
     });
 }

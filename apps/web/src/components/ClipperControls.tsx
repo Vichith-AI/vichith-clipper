@@ -39,7 +39,7 @@ export function ClipperControls({
     const isGamingDisabled = processingMode === 'browser' && preferences.layout === 'gaming_split';
 
     return (
-        <aside className="flex h-full w-full flex-col justify-between overflow-y-auto border-r border-white/10 bg-vichith-graphite/40 text-vichith-white p-4 sm:p-5">
+        <div className="flex min-h-full w-full flex-col justify-between text-vichith-white p-4 sm:p-5">
             <div className="space-y-6">
                 {/* Header title */}
                 <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
@@ -330,6 +330,6 @@ export function ClipperControls({
                         : 'Reserved for completed runs · Zero credit charge for setup'}
                 </p>
             </div>
-        </aside>
+        </div>
     );
 }
