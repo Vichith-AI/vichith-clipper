@@ -46,9 +46,10 @@ export function ClipperControls({
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-vichith-silver">
                         Configuration
                     </span>
-                    <span className="font-mono text-[10px] text-vichith-muted">
-                        Vichith Studio
-                    </span>
+                    <div className="flex items-center gap-1.5 font-mono text-[10px] text-vichith-muted">
+                        <img src="/logo_square.png" alt="" className="h-3.5 w-3.5 rounded object-contain" />
+                        <span>Vichith Studio</span>
+                    </div>
                 </div>
 
                 {/* 1. Framing Layout */}

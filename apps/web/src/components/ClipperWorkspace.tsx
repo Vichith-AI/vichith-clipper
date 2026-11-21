@@ -301,8 +301,10 @@ export function ClipperWorkspace() {
                     candidateId: clip.candidateId,
                     projectId: projectId || undefined,
                     assetId: clip.assetId,
+                    sourceAssetId: clip.assetId,
                     startSecs: clip.startSecs,
                     endSecs: clip.endSecs,
+                    durationSecs: Math.max(1, clip.endSecs - clip.startSecs),
                     layout: preferences.layout,
                     captionMotion: preferences.captionStyle === 'karaoke' ? 'highlight_wipe' : 'pop_in',
                 }),
@@ -357,7 +359,7 @@ export function ClipperWorkspace() {
             {/* Main 3-Pane Horizontal Studio Workspace */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left Pane: Controls & Presets */}
-                <aside className={`w-[340px] shrink-0 border-r border-white/[0.08] bg-[#0A0C0E] flex flex-col overflow-y-auto ${activeMobileTab === 'controls' ? 'flex' : 'hidden xl:flex'}`}>
+                <aside className={`w-[340px] shrink-0 border-r border-white/[0.08] bg-[#0A0C0E] flex flex-col overflow-y-auto custom-scrollbar ${activeMobileTab === 'controls' ? 'flex' : 'hidden xl:flex'}`}>
                     <ClipperControls
                         preferences={preferences}
                         onChangePreferences={setPreferences}
@@ -410,7 +412,7 @@ export function ClipperWorkspace() {
                 </main>
 
                 {/* Right Pane: Moments Inspector & Compose Export */}
-                <aside className={`w-[360px] shrink-0 border-l border-white/[0.08] bg-[#0A0C0E] flex flex-col overflow-y-auto ${activeMobileTab === 'inspector' ? 'flex' : 'hidden xl:flex'}`}>
+                <aside className={`w-[360px] shrink-0 border-l border-white/[0.08] bg-[#0A0C0E] flex flex-col overflow-y-auto custom-scrollbar ${activeMobileTab === 'inspector' ? 'flex' : 'hidden xl:flex'}`}>
                     <ClipperInspector
                         clips={clips}
                         selectedClipIndex={selectedClipIndex}

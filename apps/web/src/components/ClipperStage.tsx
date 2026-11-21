@@ -164,10 +164,11 @@ export function ClipperStage({
     const selectedClip = clips[selectedClipIndex] ?? clips[0] ?? null;
 
     // REAL progress calculation (Never fake 96%!)
-    const realPercent = serverProgress != null && serverProgress > 0
+    const isWorkerStopped = workerStatus?.state === 'stopped';
+    const realPercent = isWorkerStopped
+        ? 0
+        : serverProgress != null && serverProgress > 0
         ? Math.min(100, Math.round(serverProgress * 100))
-        : jobStatus === 'processing'
-        ? 15
         : 0;
 
     const milestones = [
@@ -325,23 +326,27 @@ export function ClipperStage({
                             </div>
                         )}
 
-                        {/* Working Spinner */}
+                        {/* Working Spinner with Vichith Logo */}
                         <div className="relative mb-6 flex h-20 w-20 items-center justify-center">
-                            <div className="absolute inset-0 rounded-full bg-vichith-mint/10 animate-ping" />
-                            <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-vichith-graphite border border-vichith-mint/30 shadow-[0_0_30px_rgba(52,211,153,0.2)]">
-                                <GlyphWorking className="h-8 w-8 text-vichith-mint" />
+                            <div className="absolute inset-0 rounded-full bg-vichith-mint/15 animate-ping" />
+                            <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-black border border-vichith-mint/30 shadow-[0_0_30px_rgba(52,211,153,0.25)] p-2.5 overflow-hidden">
+                                <img src="/logo_square.png" alt="Vichith" className="h-full w-full object-contain" />
                             </div>
                         </div>
 
                         <h2 className="font-display text-2xl font-bold tracking-tight text-vichith-white">
-                            {jobStatus === 'processing'
+                            {isWorkerStopped
+                                ? 'EC2 Worker Stopped · Click to Wake'
+                                : jobStatus === 'processing'
                                 ? 'Crafting your vertical Shorts'
-                                : workerStatus?.state === 'stopped'
-                                ? 'Job Enqueued · Worker Sleeping'
+                                : workerStatus?.state === 'pending'
+                                ? 'Starting Worker Instance…'
                                 : 'Connecting to Compute Pipeline…'}
                         </h2>
                         <p className="mt-2 text-xs text-vichith-silver max-w-sm">
-                            {note || 'Analyzing audio crests, Whisper timestamps, and framing 9:16 cuts…'}
+                            {isWorkerStopped
+                                ? 'The c7i.2xlarge compute worker powers down when idle ($0/hr). Wake it up below to process your stream.'
+                                : note || 'Analyzing audio crests, Whisper timestamps, and framing 9:16 cuts…'}
                         </p>
 
                         {/* Real Progress Bar */}
@@ -410,7 +415,7 @@ export function ClipperStage({
                                 />
                             ) : (
                                 <div className="flex flex-col items-center justify-center text-center p-6 space-y-3">
-                                    <Film className="h-10 w-10 text-vichith-mint" />
+                                    <img src="/logo_square.png" alt="Vichith" className="h-12 w-12 rounded-xl object-contain shadow-md" />
                                     <span className="font-display font-bold text-vichith-white text-base">
                                         Short #{selectedClipIndex + 1}
                                     </span>
@@ -607,8 +612,8 @@ export function ClipperStage({
                                     : 'border-white/10 bg-[#0A0C0E] hover:border-white/20 hover:bg-white/[0.02]'
                             }`}
                         >
-                            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-white/[0.06] text-vichith-mint transition-transform group-hover:scale-105">
-                                <UploadCloud className="h-7 w-7" />
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-black/60 border border-white/10 p-2.5 shadow-xl transition-transform group-hover:scale-105">
+                                <img src="/logo_square.png" alt="Vichith" className="h-full w-full object-contain" />
                             </div>
                             <h3 className="font-display text-2xl font-bold text-vichith-white">
                                 Drop your stream capture or VOD

@@ -54,7 +54,7 @@ export function validateVodFile(file: Pick<File, 'name' | 'size' | 'type'>, isFr
 }
 
 export function formatVodDuration(seconds: number | null): string {
-    if (seconds === null || !Number.isFinite(seconds)) return 'Duration not measured';
+    if (seconds === null || !Number.isFinite(seconds) || seconds <= 0) return 'Stream';
     const total = Math.max(0, Math.round(seconds));
     const hours = Math.floor(total / 3600);
     const minutes = Math.floor((total % 3600) / 60);

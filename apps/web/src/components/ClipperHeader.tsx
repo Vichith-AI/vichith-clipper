@@ -14,7 +14,6 @@ import {
     Globe,
     Cpu,
     RefreshCw,
-    Sparkles,
 } from 'lucide-react';
 import type { Gta6EntitlementState } from '@/lib/launch/gta6Promo';
 import { formatVodDuration } from './config';
@@ -146,14 +145,20 @@ export function ClipperHeader({
             {/* Left: Project & Media Switcher */}
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                 {/* Brand / Logo */}
-                <div className="flex items-center gap-2 mr-1">
-                    <span className="font-display font-bold tracking-tight text-vichith-white text-sm">
-                        vichith<span className="text-vichith-mint">.clipper</span>
+                <a
+                    href="https://www.vichith.in"
+                    className="flex items-center gap-2 mr-2 hover:opacity-90 transition-opacity"
+                    title="Vichith"
+                >
+                    <img
+                        src="/logo_square.png"
+                        alt="Vichith"
+                        className="h-7 w-7 rounded-lg object-contain shadow-sm"
+                    />
+                    <span className="font-display font-bold tracking-tight text-vichith-white text-base">
+                        vichith
                     </span>
-                    <span className="hidden sm:inline-block rounded bg-vichith-mint/10 border border-vichith-mint/20 px-1.5 py-0.5 text-[9px] font-mono font-medium text-vichith-mint">
-                        PRO
-                    </span>
-                </div>
+                </a>
 
                 {/* Project Selector */}
                 <div className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] px-2.5 py-1 text-xs text-vichith-silver transition-colors hover:text-vichith-white">
@@ -188,7 +193,7 @@ export function ClipperHeader({
 
                 {/* VOD Selector Pill */}
                 {selectedAsset ? (
-                    <div className="flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.08] px-3 py-1 text-xs text-vichith-silver">
+                    <div className="flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.08] px-3 py-1 text-xs text-vichith-silver shrink-0">
                         <Film className="h-3.5 w-3.5 text-vichith-mint flex-shrink-0" />
                         {assets.length > 1 ? (
                             <div className="flex items-center gap-1">
@@ -197,19 +202,27 @@ export function ClipperHeader({
                                     value={selectedAsset.id}
                                     disabled={busy}
                                     onChange={(e) => onSelectAsset(e.target.value)}
-                                    className="max-w-[110px] sm:max-w-[140px] truncate bg-transparent font-mono text-[11px] text-vichith-white outline-none cursor-pointer"
+                                    className="max-w-[110px] sm:max-w-[140px] truncate bg-transparent font-sans text-[11px] text-vichith-white outline-none cursor-pointer"
                                 >
                                     {assets.map((asset) => (
                                         <option key={asset.id} value={asset.id} className="bg-vichith-graphite text-vichith-white">
-                                            {asset.source === 'uploaded' ? 'VOD' : 'Stream'} · {asset.id.slice(0, 8)}
+                                            {asset.source === 'uploaded' ? 'VOD' : asset.source.toUpperCase()} · {asset.id.slice(0, 8)}
                                         </option>
                                     ))}
                                 </select>
                                 <ChevronDown className="h-3 w-3 text-vichith-muted pointer-events-none" />
                             </div>
                         ) : (
-                            <span className="font-mono text-[11px] text-vichith-white">
-                                {selectedAsset.id.slice(0, 10)}
+                            <span className="font-sans text-[11px] font-medium text-vichith-white">
+                                {selectedAsset.source === 'youtube'
+                                    ? 'YouTube'
+                                    : selectedAsset.source === 'twitch'
+                                    ? 'Twitch'
+                                    : selectedAsset.source === 'kick'
+                                    ? 'Kick'
+                                    : selectedAsset.source === 'uploaded'
+                                    ? 'VOD'
+                                    : 'Stream'}
                             </span>
                         )}
                         <span className="rounded-full bg-white/[0.08] px-1.5 py-0.5 font-mono text-[10px] text-vichith-silver">
@@ -219,7 +232,7 @@ export function ClipperHeader({
                             type="button"
                             onClick={onUploadClick}
                             disabled={busy}
-                            className="ml-1 text-[11px] text-vichith-silver hover:text-vichith-mint transition-colors"
+                            className="ml-1 text-[11px] text-vichith-silver hover:text-vichith-mint transition-colors whitespace-nowrap"
                         >
                             Replace
                         </button>

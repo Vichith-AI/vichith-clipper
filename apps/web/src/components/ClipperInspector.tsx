@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Check, Film, Mic, Sparkles, Volume2, Video, Type, Music, Play, Layers } from 'lucide-react';
+import { ArrowUpRight, Check, Film, Mic, Volume2, Video, Type, Music, Play, Layers } from 'lucide-react';
 import { GlyphWorking } from '@/components/vichith/glyphs';
 import type { ProducedClip } from './ClipperStage';
 import type { VodAsset } from './ClipperHeader';
@@ -61,10 +61,15 @@ export function ClipperInspector({
                     <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-vichith-silver">
                         {hasClips ? 'Short Inspector' : 'Timeline Setup'}
                     </span>
-                    {hasClips && (
+                    {hasClips ? (
                         <span className="rounded-full bg-vichith-mint/10 px-2 py-0.5 font-mono text-[10px] text-vichith-mint">
                             Short #{selectedClipIndex + 1}
                         </span>
+                    ) : (
+                        <div className="flex items-center gap-1.5 font-mono text-[10px] text-vichith-muted">
+                            <img src="/logo_square.png" alt="" className="h-3.5 w-3.5 rounded object-contain" />
+                            <span>Vichith 5-Track</span>
+                        </div>
                     )}
                 </div>
 

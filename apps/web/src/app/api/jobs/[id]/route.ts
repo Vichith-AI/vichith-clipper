@@ -19,11 +19,18 @@ export async function GET(
     const supabase = getSupabase();
 
     if (!supabase) {
+        let workerStatus = null;
+        try {
+            workerStatus = await getWorkerStatus();
+        } catch {
+            // Non-blocking
+        }
         return NextResponse.json({
             id: jobId,
-            status: 'processing',
-            progress: 0.5,
-            message: 'Running in standalone local simulation mode.',
+            status: 'queued',
+            progress: 0,
+            message: 'Supabase database credentials not configured in environment.',
+            workerStatus,
         });
     }
 
